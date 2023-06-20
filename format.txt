@@ -1,0 +1,9 @@
+.wrap_page_content
+	>.item>.item__main>.message[data-id=%MES_ID%]
+		>.message__header{%TIMESTAMP%}
+		+ div>
+		MESSAGE+
+		.kludges>.attachment{
+			.attachment__description+
+			%ATTACHMENT%}*%COUNT%
+
