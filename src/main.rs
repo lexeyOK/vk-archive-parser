@@ -1,16 +1,22 @@
-#![allow(unused_imports, unused_variables, dead_code)]
 use aho_corasick::AhoCorasick;
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::NaiveDateTime;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
+use tl::{HTMLTag, Parser};
+
+use std::collections::HashSet;
 use std::fs;
 use std::io::BufRead;
+use std::path::Path;
 use std::sync::OnceLock;
-use tl::{parse, HTMLTag, Parser};
+use std::time::Instant;
+
 const TIME_ZONE_CORRECTION: i64 = 5 * 3600; // one hour is 3600 seconds
 const SELF_ID_URL: &str = "https://vk.com/id321553803";
 static AC: OnceLock<AhoCorasick> = OnceLock::new();
 
 fn main() {
+    let started = Instant::now();
     // take filename from argument and open file for reading
     let folder = std::env::args()
         .nth(1)
@@ -19,11 +25,42 @@ fn main() {
         std::fs::metadata(folder.clone())
             .expect("is valid folder")
             .is_dir(),
-        "{:?} is not valid folder",
-        folder
+        "is valid folder"
     );
+    let path = Path::new(&folder);
+    print!("{:?} ", &folder);
+    let chat = parse_vk_chat(path);
+    println!("{:?} in {:?}", chat.users, started.elapsed());
+}
 
-    let file_paths = fs::read_dir(folder)
+/// Pased vk chat.
+#[derive(Debug, Eq, PartialEq)]
+struct VkChat {
+    id: isize, // can be negative
+    //title: String,
+    users: HashSet<isize>,  // id-s
+    messages: Vec<Message>, // can be very long
+}
+
+/// Single file parsed
+#[derive(Debug, Eq, PartialEq)]
+struct VkPage {
+    page_number: usize,
+    message_items: Vec<Message>,
+}
+
+/// Contains parsed messages
+#[derive(Debug, Eq, PartialEq, Clone)]
+struct Message {
+    id: usize,
+    from_id: isize,
+    date: i64,
+    message_text: String,
+}
+
+/// Parse chat folder.
+fn parse_vk_chat(folder: impl AsRef<Path> + Copy) -> VkChat {
+    let file_paths: Vec<_> = fs::read_dir(folder)
         .expect("access denied")
         .filter_map(|entry| {
             let path = entry.unwrap().path();
@@ -33,43 +70,50 @@ fn main() {
                 None
             }
         })
-        .collect::<Vec<_>>();
-
-    file_paths.par_iter().for_each(|file_path| {
-        let file = fs::File::open(file_path).unwrap();
-        let page = parse_file(file);
-        println!("{:?} {}", file_path, page.message_items.len());
-    });
-
-    //let pages = file_paths
-    //    .map(|file_path| parse_file(std::fs::File::open(file_path.unwrap()).message_items.len());
-    //file_paths.zip(pages).for_each(|(file_path,message_count)| println!("{:?} {}", file_path,message_count));
-    //let page = parse_file(file);
-    // page.message_items.iter().for_each(|e| println!("{:?}",e));
-    //println!("{:?}", page.message_items.len());
+        .collect();
+    let id: &isize = &folder
+        .as_ref()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .parse::<_>()
+        .unwrap();
+    // let title = parse_title(&file_paths[0]);
+    let mut pages: Vec<VkPage> = file_paths
+        .par_iter()
+        .progress_with(
+            ProgressBar::new(file_paths.len() as u64).with_style(
+                ProgressStyle::with_template("[{pos}/{len}] [{wide_bar}] {per_sec}")
+                    .expect("incorect style")
+                    .progress_chars("=> "),
+            ),
+        )
+        .map(|file_path| {
+            let file = fs::File::open(file_path).unwrap();
+            // read file into a string
+            let contents = std::io::BufReader::new(file);
+            let text = contents.lines().map(|l| l.unwrap()).collect::<String>();
+            parse_text(&text)
+        })
+        .collect();
+    pages.sort_by(|a, b| a.page_number.cmp(&b.page_number));
+    join_pages(&pages, *id)
 }
 
-// Single file parsed
-struct VkPage {
-    page_number: usize,
-    message_items: Vec<Message>,
-}
-
-/// Contains parsed messages
-#[derive(Debug, Eq, PartialEq)]
-struct Message {
-    id: i32,
-    from_id: i32,
-    date: i64,
-    message_text: String,
-}
-
-/// parse single archive file
-fn parse_file(file: impl std::io::Read) -> VkPage {
-    // read file into a string
-    let contents = std::io::BufReader::new(file);
-    let text = contents.lines().map(|l| l.unwrap()).collect::<String>();
-    parse_text(&text)
+// Take `&[VkPage]` and make all messages into VkChat
+fn join_pages(pages: &[VkPage], id: isize) -> VkChat {
+    let messages: Vec<_> = pages
+        .iter()
+        .flat_map(|page| page.message_items.iter())
+        .cloned()
+        .collect();
+    let users: HashSet<_> = messages.par_iter().map(|message| message.from_id).collect();
+    VkChat {
+        id,
+        users,
+        messages,
+    }
 }
 
 /// parse html page.
@@ -79,7 +123,7 @@ fn parse_text(input: &str) -> VkPage {
     let messages = dom.get_elements_by_class_name("message");
     let message_items: Vec<Message> = messages
         .map(|message| message.get(parser).unwrap().as_tag().unwrap())
-        .map(|message| parse_message(message,parser))
+        .map(|message| parse_message(message, parser))
         .collect();
     let page_number: usize = match dom.get_elements_by_class_name("pg_lnk_sel").next() {
         Some(link) => link
@@ -97,7 +141,8 @@ fn parse_text(input: &str) -> VkPage {
 }
 
 fn parse_message(item: &tl::HTMLTag<'_>, parser: &tl::Parser) -> Message {
-    let id: i32 = item
+    let item_nodes = item.children().all(parser);
+    let id: usize = item
         .attributes()
         .get("data-id")
         .unwrap()
@@ -105,6 +150,7 @@ fn parse_message(item: &tl::HTMLTag<'_>, parser: &tl::Parser) -> Message {
         .as_utf8_str()
         .parse()
         .unwrap();
+
     let header = item
         .query_selector(parser, ".message__header")
         .unwrap()
@@ -114,11 +160,13 @@ fn parse_message(item: &tl::HTMLTag<'_>, parser: &tl::Parser) -> Message {
         .unwrap()
         .as_tag()
         .unwrap();
+
     let (from_id, date) = parse_header(header, parser);
-    let item_nodes = item.children().all(parser);
+
     let message_text = item_nodes[item_nodes.len() - 2]
         .inner_text(parser)
         .to_string();
+
     Message {
         id,
         from_id,
@@ -126,7 +174,6 @@ fn parse_message(item: &tl::HTMLTag<'_>, parser: &tl::Parser) -> Message {
         message_text,
     }
 }
-
 fn parse_date_time(input: &str) -> NaiveDateTime {
     let ac = AC.get_or_init(|| {
         AhoCorasick::new([
@@ -145,6 +192,7 @@ fn parse_date_time(input: &str) -> NaiveDateTime {
 
 #[test]
 fn simple() {
+    use chrono::NaiveDate;
     let string = "20 июн 2023 в 8:34:00 (ред.)";
     let dt = NaiveDate::from_ymd_opt(2023, 6, 20)
         .unwrap()
@@ -153,7 +201,7 @@ fn simple() {
     assert_eq!(parse_date_time(string), dt);
 }
 
-fn parse_header(header: &HTMLTag, parser: &Parser) -> (i32, i64) {
+fn parse_header(header: &HTMLTag, parser: &Parser) -> (isize, i64) {
     let from_link_href = match header.query_selector(parser, "a").unwrap().next() {
         Some(link) => link
             .get(parser)
@@ -169,15 +217,16 @@ fn parse_header(header: &HTMLTag, parser: &Parser) -> (i32, i64) {
     };
 
     let from_id_str = from_link_href.split_at(15).1;
-    let from_id: i32 = from_id_str
-        .matches(char::is_numeric)
-        .collect::<String>()
-        .parse()
-        .unwrap();
-
+    let from_id_idx = from_id_str.find(|c| char::is_ascii_digit(&c)).unwrap();
+    let (tp, from_id_str) = from_id_str.split_at(from_id_idx);
+    let from_id = match (tp, from_id_str.parse::<isize>().unwrap()) {
+        ("club" | "public", from_id) => -from_id,
+        ("id", from_id) => from_id,
+        _ => unreachable!(),
+    };
     let header_str = header.inner_text(parser);
     let time_str = header_str.rsplit_once(", ").unwrap().1;
-    let date: i64 = parse_date_time(&time_str).timestamp() + TIME_ZONE_CORRECTION;
+    let date: i64 = parse_date_time(time_str).timestamp() + TIME_ZONE_CORRECTION;
     (from_id, date)
 }
 

@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 aho-corasick = "1.0.2"
 chrono = "0.4.26"
+indicatif = { version = "0.17.5", features = ["rayon"] }
 rayon = "1.7.0"
 tl = { version = "0.7.7", features = ["simd"] }
 
 [profile.release]
-debug = true
+# debug = true 
+# lto = true
