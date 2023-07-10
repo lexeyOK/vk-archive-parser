@@ -2,6 +2,8 @@ use aho_corasick::AhoCorasick;
 use chrono::NaiveDateTime;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+use serde_json;
 use tl::ParserOptions;
 
 use std::{
@@ -14,42 +16,28 @@ use std::{
 };
 
 const TIME_ZONE_CORRECTION: i64 = 5 * 3600; // one hour is 3600 seconds
-const SELF_ID_URL: &str = "https://vk.com/id321553803";
-const DEFUALT_FOLDER: &str = "/home/alex/dev/vk_utf8/messages/13096417";
-
+const SELF_ID_URL: &str = "https://vk.com/id123123123"; // get your own preak :(
 fn main() {
     let started = Instant::now();
     // take filename from argument and open file for reading
     let folder = std::env::args()
         .nth(1)
-        .unwrap_or(DEFUALT_FOLDER.to_string());
-    //.expect("vk-archive-parser [folder-name]");
+        .expect("vk-archive-parser [folder-name]");
     //let metadata = std::fs::metadata(folder.clone()).unwrap();
 
     let path = Path::new(&folder);
     print!("{:?} ", &folder);
     let chat = parse_vk_chat(path);
-    let timestamps = chat
-        .messages
-        .iter()
-        .map(|message| message.date)
-        .collect::<Vec<i64>>();
-    let data_file = File::create("data.tsv").unwrap();
+    
+    let data_file = File::create(format!("{}.json", chat.id)).unwrap();
     let mut writer = BufWriter::new(data_file);
-    let time_offset = timestamps.iter().min().unwrap();
-    timestamps
-        .iter()
-        .rev()
-        .enumerate()
-        .for_each(|(i, timestamp)| {
-            writeln!(writer, "{}\t{}", i, timestamp - time_offset).unwrap();
-        });
-
-    println!("{:?} in {:?}", timestamps.len(), started.elapsed());
+    let serialised = serde_json::to_string_pretty(&chat).expect("you have fuckted up");
+    writer.write_all(serialised.as_ref()).unwrap();
+    println!("Done in {:?}!", started.elapsed());
 }
 
 /// Pased vk chat.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct VkChat {
     id: isize, // can be negative
     //title: String,
@@ -65,7 +53,7 @@ struct VkPage {
 }
 
 /// Contains parsed messages.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct Message {
     id: usize,
     from_id: isize,
@@ -75,7 +63,7 @@ struct Message {
 }
 
 /// Attachment to a `Message`.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct Attachment {
     description: String,
     link: Option<String>,
@@ -256,7 +244,7 @@ fn parse_from_id(slug_str: &str) -> isize {
 
 #[test]
 fn simple_from_id() {
-    assert_eq!(parse_from_id(SELF_ID_URL.split_at(15).1), 321553803);
+    assert_eq!(parse_from_id(SELF_ID_URL.split_at(15).1), 123123123);
     assert_eq!(parse_from_id("club1"), -1);
 }
 
