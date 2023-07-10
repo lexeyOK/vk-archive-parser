@@ -1,6 +1,6 @@
 # vk-archive-parser
 parse vk messages from archive
-uses rust and some cool crates
+uses rust (**nightly**) and some cool crates
 you will need to setup it first as it is still **WIP**
 
 # setup
