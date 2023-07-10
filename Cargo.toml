@@ -1,6 +1,6 @@
 [package]
 name = "vk-archive-parser"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -13,5 +13,5 @@ rayon = "1.7.0"
 tl = { version = "0.7.7", features = ["simd"] }
 
 [profile.release]
-# debug = true 
+debug = true
 # lto = true
