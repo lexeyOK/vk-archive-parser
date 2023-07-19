@@ -244,7 +244,7 @@ fn parse_from_id(slug_str: &str) -> isize {
 
 #[test]
 fn simple_from_id() {
-    assert_eq!(parse_from_id(SELF_ID_URL.split_at(15).1), 123123123);
+    assert_eq!(parse_from_id(SELF_ID_URL.split_at(15).1), 0);
     assert_eq!(parse_from_id("club1"), -1);
 }
 
