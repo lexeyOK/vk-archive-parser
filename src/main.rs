@@ -16,7 +16,7 @@ use std::{
 };
 
 const TIME_ZONE_CORRECTION: i64 = 5 * 3600; // one hour is 3600 seconds
-const SELF_ID_URL: &str = "https://vk.com/id123123123"; // get your own preak :(
+const SELF_ID_URL: &str = "https://vk.com/id0";
 fn main() {
     let started = Instant::now();
     // take filename from argument and open file for reading
@@ -28,7 +28,7 @@ fn main() {
     let path = Path::new(&folder);
     print!("{:?} ", &folder);
     let chat = parse_vk_chat(path);
-    
+
     let data_file = File::create(format!("{}.json", chat.id)).unwrap();
     let mut writer = BufWriter::new(data_file);
     let serialised = serde_json::to_string_pretty(&chat).expect("you have fuckted up");
