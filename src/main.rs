@@ -1,5 +1,7 @@
 use aho_corasick::AhoCorasick;
 use chrono::NaiveDateTime;
+use encoding_rs::WINDOWS_1251;
+use encoding_rs_io::DecodeReaderBytesBuilder;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -9,7 +11,7 @@ use tl::ParserOptions;
 use std::{
     collections::HashSet,
     fs::File,
-    io::{BufRead, BufWriter, Write},
+    io::{BufRead, BufReader, BufWriter, Read, Write},
     path::Path,
     sync::OnceLock,
     time::Instant,
@@ -104,9 +106,12 @@ fn parse_vk_chat(folder: impl AsRef<Path>) -> VkChat {
 
 fn parse_file(file_path: impl AsRef<Path>) -> VkPage {
     let file = std::fs::File::open(file_path).unwrap();
-    // read file into a string
-    let contents = std::io::BufReader::new(file);
-    let text = contents.lines().map(|l| l.unwrap()).collect::<String>();
+    let file = DecodeReaderBytesBuilder::new()
+        .encoding(Some(WINDOWS_1251))
+        .build(file);
+    let mut buffer = BufReader::new(file);
+    let mut text = String::new();
+    buffer.read_to_string(&mut text).unwrap();
     parse_text(&text)
 }
 
@@ -199,7 +204,7 @@ fn parse_message(message: &tl::HTMLTag<'_>, parser: &tl::Parser) -> Message {
         parse_date_time(date_str) + TIME_ZONE_CORRECTION
     };
 
-    let message_text = message.inner_text(parser).to_string();
+    let message_text = message.inner_text(parser).trim().to_string();
 
     let attachments = message.query_selector(parser, ".attachment").map(|iter| {
         iter.map(|handle| parse_attachment(handle.get(parser).unwrap().as_tag().unwrap(), parser))
@@ -262,7 +267,7 @@ fn parse_date_time(date_str: &str) -> i64 {
     ];
     let result = ac.replace_all(date_str, replace_with);
     NaiveDateTime::parse_and_remainder(&result, "%d %m %Y в %H:%M:%S")
-        .unwrap()
+        .expect(&format!("this is not a walid date time: {}", &result))
         .0
         .timestamp()
 }
