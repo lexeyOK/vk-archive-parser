@@ -17,7 +17,7 @@ use std::{
 
 const TIME_ZONE_CORRECTION: i64 = 5 * 3600; // one hour is 3600 seconds
 const SELF_ID_URL: &str = "https://vk.com/id0";
-/// Pased vk chat.
+/// Parsed vk chat.
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VkChat {
     pub id: isize, // can be negative
@@ -79,7 +79,7 @@ pub fn parse_pages(folder: impl AsRef<Path>) -> Vec<VkPage> {
         .collect::<Vec<_>>();
 
     let progress_style = ProgressStyle::with_template("[{pos}/{len}] [{wide_bar}] {per_sec}")
-        .expect("incorect style")
+        .expect("invalid style")
         .progress_chars("=> ");
 
     // let title = parse_title(&file_paths[0]);
@@ -242,7 +242,7 @@ fn parse_date_time(date_str: &str) -> i64 {
     ];
     let result = ac.replace_all(date_str, replace_with);
     NaiveDateTime::parse_and_remainder(&result, "%d %m %Y в %H:%M:%S")
-        .expect(&format!("this is not a walid date time: {}", &result))
+        .unwrap_or_else(|_| panic!("this is not a valid date time: {}", &result))
         .0
         .timestamp()
 }

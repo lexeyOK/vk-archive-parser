@@ -1,6 +1,10 @@
 mod vk_chat;
-use serde_json;
-use std::{fs::File, io::{BufWriter,Write}, path::Path, time::Instant};
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+    path::Path,
+    time::Instant,
+};
 
 use vk_chat::{join_pages, parse_pages};
 
@@ -31,5 +35,5 @@ fn main() {
     let serialised = serde_json::to_string_pretty(&chat).expect("you have fuckted up");
     writer.write_all(serialised.as_ref()).unwrap();
 
-    println!("Done in {:?}!", started.elapsed());
+    println!("Done in {} s!", started.elapsed().as_secs_f32());
 }
