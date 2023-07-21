@@ -1,8 +1,8 @@
-mod VkChat;
+mod vk_chat;
 use serde_json;
-use std::{fs::File, io::BufWriter, path::Path, time::Instant};
+use std::{fs::File, io::{BufWriter,Write}, path::Path, time::Instant};
 
-use Vkchat::{join_pages, parse_pages};
+use vk_chat::{join_pages, parse_pages};
 
 fn main() {
     let started = Instant::now();

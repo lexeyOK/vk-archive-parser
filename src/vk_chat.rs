@@ -20,10 +20,10 @@ const SELF_ID_URL: &str = "https://vk.com/id0";
 /// Pased vk chat.
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VkChat {
-    id: isize, // can be negative
+    pub id: isize, // can be negative
     //title: String,
-    users: HashSet<isize>,  // id-s
-    messages: Vec<Message>, // can be very long
+    pub users: HashSet<isize>,  // id-s
+    pub messages: Vec<Message>, // can be very long
 }
 
 /// Single file parsed.
