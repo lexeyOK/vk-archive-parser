@@ -144,7 +144,6 @@ fn parse_message(message: &tl::HTMLTag<'_>, parser: &tl::Parser) -> Message {
         .as_utf8_str()
         .parse()
         .unwrap();
-
     let header = message
         .query_selector(parser, ".message__header")
         .unwrap()
@@ -173,13 +172,15 @@ fn parse_message(message: &tl::HTMLTag<'_>, parser: &tl::Parser) -> Message {
         parse_from_id(slug_str)
     };
 
+    let message_inner_text = message.inner_text(parser);
+    let split_message = message_inner_text.split("  ").collect::<Vec<_>>();
     let date = {
-        let header_str = header.inner_text(parser);
+        let header_str = split_message[1];
         let date_str = header_str.rsplit_once(", ").unwrap().1;
         parse_date_time(date_str) + TIME_ZONE_CORRECTION
     };
 
-    let message_text = message.inner_text(parser).trim().to_string();
+    let message_text = split_message[2].trim().to_string();
 
     let attachments = message.query_selector(parser, ".attachment").map(|iter| {
         iter.map(|handle| parse_attachment(handle.get(parser).unwrap().as_tag().unwrap(), parser))
