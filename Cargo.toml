@@ -1,10 +1,12 @@
 [package]
 name = "vk-archive-parser"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 aho-corasick = "1.0.2"
+anyhow = "1.0.75"
 chrono = "0.4.26"
 encoding_rs = { version = "0.8.32"}
 encoding_rs_io = "0.1.7"
