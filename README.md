@@ -12,7 +12,6 @@ to your timezone in seconds of GMT offset (GMT+5 -> 5*3600)\
 ```bash
 > mkdir vk && cd vk
 > unzip Archive.zip
-> mkdir -p ../vk_utf8
 > fd -e html cat > /dev/null # notify system to load for faster(?) acsess
 > cargo b -r
 > cd messages
